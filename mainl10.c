@@ -31,88 +31,80 @@
  * CONSTANTES 
  ------------------------------------------------------------------------------*/
 #define _XTAL_FREQ 1000000
-#define LEN_MSG 9               // Constante para definir largo de mensaje e iteraciones al enviarlo por el serial
 
 /*------------------------------------------------------------------------------
  * VARIABLES 
  ------------------------------------------------------------------------------*/
-char mensaje[LEN_MSG] = {'D', 'a', 't', 'o', ':', ' ', ' ', 0x0D, 0x0A};
-uint8_t indice = 0;             // Variable para saber que posición del mensaje enviar al serial
-uint8_t valor_old = 0;          // Variable para guardar el valor anterior recibido
 
 /*------------------------------------------------------------------------------
  * PROTOTIPO DE FUNCIONES 
  ------------------------------------------------------------------------------*/
-void setup(void);
 
-/*------------------------------------------------------------------------------
- * INTERRUPCIONES 
- ------------------------------------------------------------------------------*/
+void setup (void);
+void pollo(char data);
+void string(char *str);
 
-
-void __interrupt() isr (void){
-    if(PIR1bits.RCIF){          // Hay datos recibidos?
-        mensaje[6] = RCREG;     // Guardamos valor recibido en el arreglo mensaje
-        PORTB = mensaje[6];     // Mostramos valor recibido en el PORTD
-    }
-    return;
-}
-
-
-/*------------------------------------------------------------------------------
- * CICLO PRINCIPAL
- ------------------------------------------------------------------------------*/
-void main(void) {
-    setup();
-    while(1){
-        //__delay_ms(1000);
+/*
+ * ----------------------------- MAIN CONFIGURACION --------------------------- 
+ */
+void main (void)
+{
+    setup ();
+    
+    //---------------------- Loop principal ------------------
+    while (1)
+    {
+        __delay_ms(500);
+        string("\r AMEN \r");
         
-        indice = 0;                             // Reiniciamos indice para enviar todo el mensaje
-        if (valor_old != mensaje[6]){           // Verificamos que el nuevo valor recibido en el serial 
-                                                //   sea diferente al anterior, para imprimir solo 
-            while(indice<LEN_MSG){              // Loop para imprimir el mensaje completo
-                if (PIR1bits.TXIF){             // Esperamos a que esté libre el TXREG para poder enviar por el serial
-                    TXREG = mensaje[indice];    // Cargamos caracter a enviar
-                    indice++;                   // Incrementamos indice para enviar sigiente caracter
-                }
-            }
-            valor_old = mensaje[6];             // Guardamos valor recibido para comparar en siguiente iteración
-                                                //   si el nuevo valor recibido es diferente al anterior. 
-        }
-    }
-    return;
-}
 
-/*------------------------------------------------------------------------------
- * CONFIGURACION 
- ------------------------------------------------------------------------------*/
-void setup(void){
+        }
+        return;
+}
+/*
+ * -------------------------------- Funciones --------------------------------
+ */
+void setup (void) 
+{
+    //Configuración de puertos
     ANSEL = 0;
-    ANSELH = 0;                 // I/O digitales
+    ANSELH = 0;
     
     TRISB = 0;
-    PORTB = 0;                  // PORTD como salida
+    PORTB = 0;
     
-    OSCCONbits.IRCF = 0b100;    // 1MHz
-    OSCCONbits.SCS = 1;         // Oscilador interno
+    TRISA = 0;
+    PORTA = 0;
     
-    // Configuraciones de comunicacion serial
-    //SYNC = 0, BRGH = 1, BRG16 = 1, SPBRG=25 <- Valores de tabla 12-5
-    TXSTAbits.SYNC = 0;         // Comunicación ascincrona (full-duplex)
-    TXSTAbits.BRGH = 1;         // Baud rate de alta velocidad 
-    BAUDCTLbits.BRG16 = 1;      // 16-bits para generar el baud rate
+    //Configuración del oscilador a 1MHz
+    OSCCONbits.IRCF = 0b110;
+    OSCCONbits.SCS = 1;
     
-    SPBRG = 25;
-    SPBRGH = 0;                 // Baud rate ~9600, error -> 0.16%
+    //Configuración de TX y RX
+    TXSTAbits.SYNC = 0;
+    TXSTAbits.BRGH = 0;
+    BAUDCTLbits.BRG16 = 1;
     
-    RCSTAbits.SPEN = 1;         // Habilitamos comunicación
-    TXSTAbits.TX9 = 0;          // Utilizamos solo 8 bits
-    TXSTAbits.TXEN = 1;         // Habilitamos transmisor
-    RCSTAbits.CREN = 1;         // Habilitamos receptor
+    SPBRG = 25;                 //SPBRGH : SPBRG = 25
+    SPBRGH = 0;
     
-    // Configuraciones de interrupciones
-    INTCONbits.GIE = 1;         // Habilitamos interrupciones globales
-    INTCONbits.PEIE = 1;        // Habilitamos interrupciones de perifericos
-    PIE1bits.RCIE = 1;          // Habilitamos Interrupciones de recepción
+    RCSTAbits.SPEN = 1;
+    RCSTAbits.RX9 = 0;          //Modo 8 bits
+    RCSTAbits.CREN = 1;         //Habilitmaos la recpeción
+    TXSTAbits.TXEN = 1;         //Habilitamos la transmisión
+    //TXSTAbits.TX9 = 0;
 }
 
+    
+    void pollo(char data)
+    {
+        while(TXSTAbits.TRMT == 0);
+        TXREG = data    ;
+    }
+
+    void string (char *str){
+        while(*str != '\0'){
+            pollo(*str);
+            str++;
+        }
+    }
