@@ -35,6 +35,8 @@
 /*------------------------------------------------------------------------------
  * VARIABLES 
  ------------------------------------------------------------------------------*/
+char val;
+uint8_t number;
 
 /*------------------------------------------------------------------------------
  * PROTOTIPO DE FUNCIONES 
@@ -43,42 +45,97 @@
 void setup (void);
 void pollo(char data);
 void string(char *str);
+void setup(void);
+
+/*------------------------------------------------------------------------------
+ * INTERRUPCIONES 
+ ------------------------------------------------------------------------------*/
+void __interrupt() isr (void){
+    if(PIR1bits.ADIF){                      // Fue interrupción del ADC?
+        if(ADCON0bits.CHS == 0){            // Verificamos sea AN0 el canal seleccionado
+            RCREG = ADRESH;
+            PIR1bits.ADIF = 0;                  // Limpiamos bandera de interrupción
+        }
+        return;
+    }
+}
 
 /*
- * ----------------------------- MAIN CONFIGURACION --------------------------- 
+ * ----------------------------- MAIN -------------- --------------------------- 
  */
-void main (void)
-{
-    setup ();
-    
-    //---------------------- Loop principal ------------------
-    while (1)
+
+
+void main (void) {
+    setup();
+    while(1)
     {
-        __delay_ms(500);
-        string("\r AMEN \r");
+        string("\r Menu \r");
+        string("1. Leer potenciometro \r");
+        string("2. Enviar Ascii \r");
         
+        while(PIR1bits.RCIF == 0);
+        val = RCREG;
+        
+        switch(val)
+        {
+            case('1'):
+                string("\r Valor de potenciometro \r");
+                number = 1;
+                while(number == 1){
+                    if(ADCON0bits.GO == 0){             // No hay proceso de conversion
+                        __delay_us(40);
+                        ADCON0bits.GO = 1;              // Iniciamos proceso de conversión
+                        }
+  
+                }
+                    number = 0;
+                break;
+                
+                
+            case('2'):
+                string("\r Enviar Ascii \r");
+                number = 1;
+                while(number == 1){
+                    if(PIR1bits.RCIF){         // Hay datos recibidos?
+                    val = RCREG;     // Guardamos valor recibido en el arreglo mensaje
+                    TXREG = val;
+                    string("\r --------------------- \r");
+                    number = 0;
+                    break;
+                }
+                }
+
 
         }
         return;
 }
+}
+
 /*
  * -------------------------------- Funciones --------------------------------
  */
-void setup (void) 
-{
+void setup (void) {
     //Configuración de puertos
-    ANSEL = 0;
+    ANSEL = 0b1;
     ANSELH = 0;
     
-    TRISB = 0;
-    PORTB = 0;
     
-    TRISA = 0;
-    PORTA = 0;
+    TRISA = 0b1;
+    PORTA = 0b1;
     
     //Configuración del oscilador a 1MHz
     OSCCONbits.IRCF = 0b110;
     OSCCONbits.SCS = 1;
+    
+    // Configuración ADC
+    ADCON0bits.ADCS = 0b01;     // Fosc/8
+    ADCON1bits.VCFG0 = 0;       // VDD
+    ADCON1bits.VCFG1 = 0;       // VSS
+    ADCON0bits.CHS = 0b0000;    // Seleccionamos el AN0
+    ADCON1bits.ADFM = 0;        // Justificado a la izquierda
+    ADCON0bits.ADON = 1;        // Habilitamos modulo ADC
+    __delay_us(40);             // Sample time
+    
     
     //Configuración de TX y RX
     TXSTAbits.SYNC = 0;
@@ -93,13 +150,18 @@ void setup (void)
     RCSTAbits.CREN = 1;         //Habilitmaos la recpeción
     TXSTAbits.TXEN = 1;         //Habilitamos la transmisión
     //TXSTAbits.TX9 = 0;
+    
+     // Configuracion interrupciones
+    PIR1bits.ADIF = 0;          // Limpiamos bandera de ADC
+    PIE1bits.ADIE = 1;          // Habilitamos interrupcion de ADC
+    INTCONbits.PEIE = 1;        // Habilitamos int. de perifericos
+    INTCONbits.GIE = 1;         // Habilitamos int. globales
 }
 
-    
-    void pollo(char data)
+void pollo(char data)
     {
         while(TXSTAbits.TRMT == 0);
-        TXREG = data    ;
+        TXREG = data;
     }
 
     void string (char *str){
@@ -108,3 +170,5 @@ void setup (void)
             str++;
         }
     }
+    
+    
